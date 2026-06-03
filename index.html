@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Profit → Price Model</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #080c14;
+    --card: #0f1520;
+    --card-b: #1a2233;
+    --accent: #00e5c8;
+    --accent-dim: rgba(0,229,200,0.1);
+    --green: #2ee89e;
+    --green-dim: rgba(46,232,158,0.08);
+    --orange: #ffaa44;
+    --red: #ff6b6b;
+    --text: #e4e9f0;
+    --text-dim: #8a95a8;
+    --text-muted: #556077;
+    --input-bg: #151d2e;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: 'DM Sans', -apple-system, sans-serif;
+    padding: 20px 16px 40px; min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+  }
+  .mono { font-family: 'DM Mono', 'SF Mono', monospace; }
+
+  /* Header */
+  .hdr { margin-bottom: 24px; }
+  .hdr h1 {
+    font-size: 24px; font-weight: 700; letter-spacing: -0.03em;
+    background: linear-gradient(135deg, var(--accent), var(--green));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  }
+  .hdr p { font-size: 13px; color: var(--text-dim); margin-top: 6px; line-height: 1.5; }
+
+  /* Collapsible mental model */
+  .explainer {
+    background: var(--card); border-radius: 12px; border: 1px solid var(--card-b);
+    padding: 14px 16px; margin-bottom: 18px; cursor: pointer;
+    transition: background 0.2s;
+  }
+  .explainer:hover { background: var(--input-bg); }
+  .explainer-head { display:flex; justify-content:space-between; align-items:center; }
+  .explainer-head span { font-size:13px; font-weight:600; color:var(--accent); }
+  .explainer-head small { font-size:11px; color:var(--text-muted); }
+  .explainer-body { margin-top:12px; font-size:13px; line-height:1.75; color:var(--text-dim); display:none; }
+  .explainer-body.open { display:block; }
+  .explainer-body strong { color: var(--text); }
+  .callout {
+    background: var(--accent-dim); border-left: 3px solid var(--accent);
+    border-radius: 0 8px 8px 0; padding: 10px 12px; margin-top: 12px;
+    font-size: 13px;
+  }
+  .callout b { color: var(--accent); }
+
+  /* Input Grid */
+  .inputs { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:16px; }
+  .field label {
+    display:block; font-size:10px; font-weight:600; color:var(--text-muted);
+    text-transform:uppercase; letter-spacing:0.08em; margin-bottom:4px;
+  }
+  .field .input-wrap {
+    display:flex; align-items:center;
+    background:var(--input-bg); border-radius:8px; border:1px solid var(--card-b);
+    padding: 0 12px; height:44px; transition: border-color 0.2s;
+  }
+  .field .input-wrap:focus-within { border-color: var(--accent); }
+  .field .input-wrap .pre, .field .input-wrap .suf {
+    color:var(--text-muted); font-size:13px; white-space:nowrap;
+  }
+  .field .input-wrap .pre { margin-right:4px; }
+  .field .input-wrap .suf { margin-left:4px; }
+  .field input[type=number] {
+    background:transparent; border:none; outline:none;
+    color:var(--text); font-size:16px; font-weight:600; width:100%;
+    font-family:'DM Mono',monospace;
+    -moz-appearance: textfield;
+  }
+  .field input::-webkit-inner-spin-button,
+  .field input::-webkit-outer-spin-button { -webkit-appearance:none; margin:0; }
+  .field .sub { font-size:10px; color:var(--text-muted); margin-top:3px; }
+
+  /* PE slider */
+  .pe-bar {
+    background: var(--card); border-radius:12px; border:1px solid var(--card-b);
+    padding:14px 16px; margin-bottom:18px;
+  }
+  .pe-bar .labels { display:flex; justify-content:space-between; margin-bottom:8px; }
+  .pe-bar .labels span { font-size:10px; font-weight:600; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.06em; }
+  .pe-bar .labels .val { font-family:'DM Mono',monospace; }
+  .pe-bar .slider-row { display:flex; align-items:center; gap:10px; }
+  .pe-bar .slider-row label { font-size:12px; color:var(--text-dim); white-space:nowrap; }
+  .pe-bar input[type=range] { flex:1; accent-color:var(--accent); height:6px; }
+  .pe-bar .slider-val {
+    font-family:'DM Mono',monospace; font-size:14px; font-weight:600;
+    min-width:50px; text-align:right;
+  }
+  .pe-bar .rst-btn {
+    background:var(--input-bg); border:1px solid var(--card-b); border-radius:6px;
+    color:var(--text-muted); font-size:10px; padding:4px 8px; cursor:pointer;
+  }
+  .pe-bar .pe-note { font-size:11px; margin-top:6px; }
+
+  /* Metric cards */
+  .metrics { display:flex; gap:10px; margin-bottom:18px; flex-wrap:wrap; }
+  .mcard {
+    background:var(--card); border-radius:10px; padding:14px 16px;
+    border:1px solid var(--card-b); flex:1; min-width:100px;
+  }
+  .mcard .ml { font-size:10px; font-weight:600; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.07em; margin-bottom:6px; }
+  .mcard .mv { font-size:20px; font-weight:700; font-family:'DM Mono',monospace; }
+  .mcard .ms { font-size:11px; color:var(--text-dim); margin-top:4px; }
+
+  /* Chart */
+  .chart-card {
+    background:var(--card); border-radius:12px; border:1px solid var(--card-b);
+    padding:16px 12px; margin-bottom:18px;
+  }
+  .chart-card .title {
+    font-size:10px; font-weight:600; color:var(--text-muted);
+    text-transform:uppercase; letter-spacing:0.08em; margin-bottom:12px; padding-left:4px;
+  }
+  canvas { width:100% !important; height:220px !important; }
+  .chart-legend { display:flex; gap:16px; justify-content:center; margin-top:8px; font-size:11px; }
+  .chart-legend span { display:flex; align-items:center; gap:5px; }
+  .legend-line { width:20px; height:3px; border-radius:2px; display:inline-block; }
+
+  /* Table */
+  .tbl-card {
+    background:var(--card); border-radius:12px; border:1px solid var(--card-b);
+    overflow:hidden; margin-bottom:18px;
+  }
+  .tbl-card .title { font-size:10px; font-weight:600; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.08em; padding:14px 16px 10px; }
+  .tbl-wrap { overflow-x:auto; }
+  table { width:100%; border-collapse:collapse; font-size:13px; }
+  thead tr { border-bottom:1px solid var(--card-b); }
+  th { padding:8px 12px; font-size:10px; font-weight:600; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.06em; text-align:right; }
+  th:first-child { text-align:left; }
+  td { padding:10px 12px; text-align:right; font-family:'DM Mono',monospace; font-size:12px; border-bottom:1px solid var(--card-b); }
+  td:first-child { text-align:left; font-weight:600; color:var(--text); }
+  tr.final-row { background:var(--green-dim); }
+
+  /* Decomposition */
+  .decomp {
+    background:var(--card); border-radius:12px; border:1px solid var(--card-b);
+    padding:16px; margin-bottom:18px;
+  }
+  .decomp .title { font-size:10px; font-weight:600; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.08em; margin-bottom:14px; }
+  .decomp-row { margin-bottom:12px; }
+  .decomp-row .dr-head { display:flex; justify-content:space-between; align-items:center; margin-bottom:3px; }
+  .decomp-row .dr-label { font-size:13px; color:var(--text); }
+  .decomp-row .dr-val { font-family:'DM Mono',monospace; font-size:14px; font-weight:700; }
+  .decomp-row .dr-desc { font-size:11px; color:var(--text-muted); }
+  .decomp-row .bar-track { height:4px; background:var(--input-bg); border-radius:2px; margin-top:6px; overflow:hidden; }
+  .decomp-row .bar-fill { height:100%; border-radius:2px; transition:width 0.4s ease; }
+  .decomp-total {
+    border-top:1px solid var(--card-b); margin-top:14px; padding-top:10px;
+    display:flex; justify-content:space-between;
+  }
+  .decomp-total .dtl { font-size:13px; font-weight:600; }
+  .decomp-total .dtv { font-family:'DM Mono',monospace; font-size:16px; font-weight:700; }
+
+  /* Rules */
+  .rules {
+    background:var(--card); border-radius:12px; border:1px solid var(--card-b);
+    padding:16px;
+  }
+  .rules .title { font-size:10px; font-weight:600; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.08em; margin-bottom:10px; }
+  .rules .rule { font-size:13px; color:var(--text-dim); line-height:1.7; margin-bottom:8px; }
+  .rules .rule:last-child { margin-bottom:0; }
+  .rules .rule strong { color:var(--text); }
+  .dot { display:inline-block; width:8px; height:8px; border-radius:2px; margin-right:6px; vertical-align:middle; }
+
+  @media(max-width:400px) {
+    .inputs { grid-template-columns:1fr; }
+    .metrics { flex-direction:column; }
+    .hdr h1 { font-size:20px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="hdr">
+  <h1>Profit → Price Model</h1>
+  <p>Stock Price = EPS × P/E Multiple. Plug in the numbers to see where price lands.</p>
+</div>
+
+<div class="explainer" onclick="toggleExplainer()">
+  <div class="explainer-head">
+    <span>📐 The Mental Model</span>
+    <small id="exp-toggle">expand ▼</small>
+  </div>
+  <div class="explainer-body" id="exp-body">
+    <div style="margin-bottom:10px">
+      <span class="mono" style="color:var(--green);font-weight:600">Price = EPS × P/E</span>
+    </div>
+    <div style="margin-bottom:8px">
+      <strong>Layer 1 — Earnings Growth (the engine):</strong> If a company grows profit at 20% CAGR and P/E stays the same, stock price also grows at 20% CAGR. This is the compounding engine.
+    </div>
+    <div style="margin-bottom:8px">
+      <strong>Layer 2 — Multiple Re-rating (the turbo):</strong> If the market starts valuing the stock at a higher P/E (because growth is accelerating, or sentiment improves), price jumps even more. A stock going from 15x to 25x P/E gives you a 67% bonus on top of earnings growth.
+    </div>
+    <div style="margin-bottom:8px">
+      <strong>Layer 3 — Multiple Compression (the risk):</strong> If growth slows, the P/E shrinks. Even if EPS is growing at 15%, a P/E drop from 40x to 20x will halve your return. This is how "expensive" stocks punish you.
+    </div>
+    <div class="callout">
+      <b>PEG Ratio = P/E ÷ Growth Rate.</b> PEG &lt; 1 means you're getting growth cheaply. PEG &gt; 2 means you're overpaying. It's a quick sanity check.
+    </div>
+  </div>
+</div>
+
+<div class="inputs">
+  <div class="field">
+    <label>Current Price</label>
+    <div class="input-wrap"><span class="pre">₹</span><input type="number" id="i-price" value="500" step="10"></div>
+  </div>
+  <div class="field">
+    <label>Current EPS</label>
+    <div class="input-wrap"><span class="pre">₹</span><input type="number" id="i-eps" value="25" step="1"></div>
+    <div class="sub">(TTM or FY)</div>
+  </div>
+  <div class="field">
+    <label>Profit Growth</label>
+    <div class="input-wrap"><input type="number" id="i-growth" value="20" step="1"><span class="suf">% CAGR</span></div>
+  </div>
+  <div class="field">
+    <label>Time Horizon</label>
+    <div class="input-wrap"><input type="number" id="i-years" value="5" step="1" min="1" max="15"><span class="suf">years</span></div>
+  </div>
+</div>
+
+<div class="pe-bar">
+  <div class="labels">
+    <span>Current P/E: <span class="val" style="color:var(--accent)" id="d-cpe">20.0x</span></span>
+    <span>PEG: <span class="val" id="d-peg">1.00</span></span>
+  </div>
+  <div class="slider-row">
+    <label>Exit P/E:</label>
+    <input type="range" id="i-exitpe" min="5" max="80" step="0.5" value="20">
+    <span class="slider-val" id="d-exitpe">20.0x</span>
+    <button class="rst-btn" id="btn-rst" onclick="resetExitPE()" style="display:none">Reset</button>
+  </div>
+  <div class="pe-note" id="d-penote" style="display:none"></div>
+</div>
+
+<div class="metrics" id="d-metrics"></div>
+
+<div class="chart-card">
+  <div class="title">Price Trajectory</div>
+  <canvas id="chart"></canvas>
+  <div class="chart-legend" id="d-legend" style="display:none">
+    <span><span class="legend-line" style="background:var(--green)"></span> With P/E change</span>
+    <span><span class="legend-line" style="background:var(--text-muted);opacity:0.5"></span> Constant P/E</span>
+  </div>
+</div>
+
+<div class="tbl-card">
+  <div class="title">Year-by-Year Breakdown</div>
+  <div class="tbl-wrap"><table id="d-table"></table></div>
+</div>
+
+<div class="decomp" id="d-decomp"></div>
+
+<div class="rules">
+  <div class="title">Quick Rules of Thumb</div>
+  <div class="rule"><span class="dot" style="background:var(--green)"></span><strong>Constant P/E:</strong> Your return ≈ EPS growth rate. 20% profit CAGR → ~20% stock CAGR.</div>
+  <div class="rule"><span class="dot" style="background:var(--accent)"></span><strong>P/E expansion:</strong> Bonus multiplier. Usually happens when growth surprises to the upside or rates fall.</div>
+  <div class="rule"><span class="dot" style="background:var(--red)"></span><strong>P/E compression:</strong> The risk. High P/E stocks need sustained high growth. Any slowdown → double hit.</div>
+  <div class="rule"><span class="dot" style="background:var(--orange)"></span><strong>PEG sweet spot:</strong> PEG between 0.5–1.0 = getting growth at a reasonable price. Above 2 = priced for perfection.</div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+let exitPEOverride = null;
+
+const els = {
+  price: $('i-price'), eps: $('i-eps'), growth: $('i-growth'),
+  years: $('i-years'), exitpe: $('i-exitpe'),
+};
+
+function toggleExplainer() {
+  const b = $('exp-body'), t = $('exp-toggle');
+  const open = b.classList.toggle('open');
+  t.textContent = open ? 'collapse ▲' : 'expand ▼';
+}
+
+function resetExitPE() {
+  exitPEOverride = null;
+  update();
+}
+
+function fmt(n) {
+  return n.toLocaleString('en-IN', { maximumFractionDigits: 0 });
+}
+
+function getInputs() {
+  const price = parseFloat(els.price.value) || 0;
+  const eps = parseFloat(els.eps.value) || 0;
+  const growth = parseFloat(els.growth.value) || 0;
+  const years = Math.max(1, Math.min(15, parseInt(els.years.value) || 5));
+  const currentPE = eps > 0 ? price / eps : 0;
+  const effectiveExitPE = exitPEOverride !== null ? exitPEOverride : currentPE;
+  return { price, eps, growth, years, currentPE, effectiveExitPE };
+}
+
+function compute({ eps, growth, years, currentPE, effectiveExitPE }) {
+  const rows = [];
+  for (let y = 0; y <= years; y++) {
+    const e = eps * Math.pow(1 + growth / 100, y);
+    const pe = y === 0 ? currentPE : currentPE + (effectiveExitPE - currentPE) * (y / years);
+    rows.push({
+      year: y, label: y === 0 ? 'Now' : 'Yr ' + y,
+      eps: e, pe: pe,
+      price: e * pe,
+      priceConst: e * currentPE,
+    });
+  }
+  return rows;
+}
+
+// Simple canvas chart
+function drawChart(rows, currentPE, effectiveExitPE, currentPrice) {
+  const canvas = $('chart');
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.parentElement.getBoundingClientRect();
+  const W = rect.width - 24;
+  const H = 220;
+  canvas.width = W * dpr;
+  canvas.height = H * dpr;
+  canvas.style.width = W + 'px';
+  canvas.style.height = H + 'px';
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+  ctx.clearRect(0, 0, W, H);
+
+  const pad = { t: 10, r: 12, b: 30, l: 52 };
+  const cw = W - pad.l - pad.r;
+  const ch = H - pad.t - pad.b;
+
+  const allPrices = rows.flatMap(r => [r.price, r.priceConst, currentPrice]);
+  const minP = Math.min(...allPrices) * 0.9;
+  const maxP = Math.max(...allPrices) * 1.1;
+
+  const xOf = i => pad.l + (i / (rows.length - 1)) * cw;
+  const yOf = v => pad.t + ch - ((v - minP) / (maxP - minP)) * ch;
+
+  // Grid lines
+  ctx.strokeStyle = '#1a2233';
+  ctx.lineWidth = 1;
+  for (let i = 0; i < 5; i++) {
+    const y = pad.t + (i / 4) * ch;
+    ctx.beginPath(); ctx.moveTo(pad.l, y); ctx.lineTo(W - pad.r, y); ctx.stroke();
+    const val = maxP - (i / 4) * (maxP - minP);
+    ctx.fillStyle = '#556077';
+    ctx.font = '10px "DM Mono", monospace';
+    ctx.textAlign = 'right';
+    ctx.fillText('₹' + (val >= 1000 ? (val/1000).toFixed(1) + 'k' : Math.round(val)), pad.l - 6, y + 3);
+  }
+
+  // X labels
+  ctx.fillStyle = '#556077';
+  ctx.font = '10px "DM Mono", monospace';
+  ctx.textAlign = 'center';
+  rows.forEach((r, i) => {
+    ctx.fillText(r.label, xOf(i), H - 8);
+  });
+
+  // Buy price reference line
+  const buyY = yOf(currentPrice);
+  ctx.setLineDash([4, 4]);
+  ctx.strokeStyle = '#556077';
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(pad.l, buyY); ctx.lineTo(W - pad.r, buyY); ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle = '#556077';
+  ctx.font = '9px "DM Sans", sans-serif';
+  ctx.textAlign = 'right';
+  ctx.fillText('Buy Price', W - pad.r, buyY - 5);
+
+  const showTwo = Math.abs(effectiveExitPE - currentPE) > 0.3;
+
+  // Constant PE line (dashed) if PE changes
+  if (showTwo) {
+    $('d-legend').style.display = 'flex';
+    // Area fill
+    ctx.beginPath();
+    ctx.moveTo(xOf(0), yOf(rows[0].priceConst));
+    rows.forEach((r, i) => ctx.lineTo(xOf(i), yOf(r.priceConst)));
+    ctx.lineTo(xOf(rows.length - 1), pad.t + ch);
+    ctx.lineTo(xOf(0), pad.t + ch);
+    ctx.closePath();
+    ctx.fillStyle = 'rgba(85,96,119,0.08)';
+    ctx.fill();
+    // Line
+    ctx.setLineDash([6, 4]);
+    ctx.strokeStyle = '#556077';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    rows.forEach((r, i) => i === 0 ? ctx.moveTo(xOf(i), yOf(r.priceConst)) : ctx.lineTo(xOf(i), yOf(r.priceConst)));
+    ctx.stroke();
+    ctx.setLineDash([]);
+  } else {
+    $('d-legend').style.display = 'none';
+  }
+
+  // Main price area
+  ctx.beginPath();
+  ctx.moveTo(xOf(0), yOf(rows[0].price));
+  rows.forEach((r, i) => ctx.lineTo(xOf(i), yOf(r.price)));
+  ctx.lineTo(xOf(rows.length - 1), pad.t + ch);
+  ctx.lineTo(xOf(0), pad.t + ch);
+  ctx.closePath();
+  const grad = ctx.createLinearGradient(0, pad.t, 0, pad.t + ch);
+  grad.addColorStop(0, 'rgba(46,232,158,0.25)');
+  grad.addColorStop(1, 'rgba(46,232,158,0)');
+  ctx.fillStyle = grad;
+  ctx.fill();
+
+  // Main price line
+  ctx.strokeStyle = '#2ee89e';
+  ctx.lineWidth = 2.5;
+  ctx.beginPath();
+  rows.forEach((r, i) => i === 0 ? ctx.moveTo(xOf(i), yOf(r.price)) : ctx.lineTo(xOf(i), yOf(r.price)));
+  ctx.stroke();
+
+  // Dots
+  rows.forEach((r, i) => {
+    ctx.beginPath();
+    ctx.arc(xOf(i), yOf(r.price), 3.5, 0, Math.PI * 2);
+    ctx.fillStyle = '#2ee89e';
+    ctx.fill();
+  });
+}
+
+function update() {
+  const { price, eps, growth, years, currentPE, effectiveExitPE } = getInputs();
+
+  // Sync slider
+  if (exitPEOverride === null) {
+    els.exitpe.value = currentPE;
+  }
+
+  // Display current PE, PEG
+  $('d-cpe').textContent = currentPE.toFixed(1) + 'x';
+  const peg = growth > 0 ? currentPE / growth : 0;
+  const pegEl = $('d-peg');
+  pegEl.textContent = peg.toFixed(2);
+  pegEl.style.color = peg <= 1 ? 'var(--green)' : peg <= 2 ? 'var(--orange)' : 'var(--red)';
+
+  // Exit PE display
+  $('d-exitpe').textContent = effectiveExitPE.toFixed(1) + 'x';
+  $('d-exitpe').style.color = effectiveExitPE > currentPE ? 'var(--green)' : effectiveExitPE < currentPE ? 'var(--red)' : 'var(--text)';
+  $('btn-rst').style.display = exitPEOverride !== null ? 'inline-block' : 'none';
+
+  // PE note
+  const peNote = $('d-penote');
+  if (Math.abs(effectiveExitPE - currentPE) > 0.3) {
+    const dir = effectiveExitPE > currentPE ? '▲ Multiple expansion' : '▼ Multiple compression';
+    const pct = ((effectiveExitPE / currentPE - 1) * 100).toFixed(0);
+    peNote.style.display = 'block';
+    peNote.style.color = effectiveExitPE > currentPE ? 'var(--green)' : 'var(--red)';
+    peNote.textContent = `${dir}: ${currentPE.toFixed(1)}x → ${effectiveExitPE.toFixed(1)}x (${pct}%)`;
+  } else {
+    peNote.style.display = 'none';
+  }
+
+  // Compute
+  const rows = compute({ eps, growth, years, currentPE, effectiveExitPE });
+  const final = rows[rows.length - 1];
+  const totalRet = price > 0 ? ((final.price - price) / price * 100) : 0;
+  const cagr = price > 0 && years > 0 ? (Math.pow(final.price / price, 1 / years) - 1) * 100 : 0;
+
+  // Metrics
+  $('d-metrics').innerHTML = `
+    <div class="mcard"><div class="ml">Price in Yr ${years}</div>
+      <div class="mv" style="color:var(--green)">₹${fmt(final.price)}</div>
+      <div class="ms">from ₹${fmt(price)}</div></div>
+    <div class="mcard"><div class="ml">Total Return</div>
+      <div class="mv" style="color:${totalRet >= 0 ? 'var(--green)' : 'var(--red)'}">${totalRet >= 0 ? '+' : ''}${totalRet.toFixed(0)}%</div>
+      <div class="ms">${(final.price / price).toFixed(1)}x</div></div>
+    <div class="mcard"><div class="ml">CAGR</div>
+      <div class="mv" style="color:${cagr >= 20 ? 'var(--green)' : cagr >= 10 ? 'var(--orange)' : 'var(--red)'}">${cagr >= 0 ? '+' : ''}${cagr.toFixed(1)}%</div>
+      <div class="ms">annualized</div></div>
+  `;
+
+  // Chart
+  drawChart(rows, currentPE, effectiveExitPE, price);
+
+  // Table
+  let thtml = '<thead><tr><th style="text-align:left"></th><th>EPS</th><th>P/E</th><th>Price</th><th>Return</th></tr></thead><tbody>';
+  rows.forEach((r, i) => {
+    const ret = i === 0 ? 0 : ((r.price - price) / price * 100);
+    const cls = i === rows.length - 1 ? ' class="final-row"' : '';
+    const peCol = r.pe > currentPE ? 'var(--green)' : r.pe < currentPE ? 'var(--red)' : 'var(--text)';
+    const retCol = ret > 0 ? 'var(--green)' : ret < 0 ? 'var(--red)' : 'var(--text-muted)';
+    thtml += `<tr${cls}>
+      <td>${r.label}</td>
+      <td style="color:var(--text)">₹${r.eps.toFixed(1)}</td>
+      <td style="color:${peCol}">${r.pe.toFixed(1)}x</td>
+      <td style="color:var(--text);font-weight:600">₹${fmt(r.price)}</td>
+      <td style="color:${retCol}">${i === 0 ? '—' : (ret >= 0 ? '+' : '') + ret.toFixed(0) + '%'}</td>
+    </tr>`;
+  });
+  thtml += '</tbody>';
+  $('d-table').innerHTML = thtml;
+
+  // Decomposition
+  const epsComp = ((final.eps / eps) - 1) * 100;
+  const peComp = ((effectiveExitPE / currentPE) - 1) * 100;
+  const interaction = totalRet - epsComp - peComp;
+  const maxAbs = Math.abs(totalRet) || 1;
+  const items = [
+    { label: 'From EPS growth', val: epsComp, color: 'var(--green)', desc: `EPS: ₹${eps} → ₹${final.eps.toFixed(1)} at ${growth}% CAGR` },
+    { label: 'From P/E change', val: peComp, color: effectiveExitPE >= currentPE ? 'var(--accent)' : 'var(--red)', desc: `P/E: ${currentPE.toFixed(1)}x → ${effectiveExitPE.toFixed(1)}x` },
+    { label: 'Interaction effect', val: interaction, color: 'var(--orange)', desc: 'EPS growth × P/E change compound' },
+  ];
+  let dhtml = '<div class="title">Return Decomposition</div>';
+  items.forEach(it => {
+    const w = Math.min(100, Math.abs(it.val) / maxAbs * 100);
+    dhtml += `<div class="decomp-row">
+      <div class="dr-head"><span class="dr-label">${it.label}</span>
+      <span class="dr-val" style="color:${it.color}">${it.val >= 0 ? '+' : ''}${it.val.toFixed(0)}%</span></div>
+      <div class="dr-desc">${it.desc}</div>
+      <div class="bar-track"><div class="bar-fill" style="width:${w}%;background:${it.color}"></div></div>
+    </div>`;
+  });
+  dhtml += `<div class="decomp-total"><span class="dtl">Total Return</span>
+    <span class="dtv" style="color:${totalRet >= 0 ? 'var(--green)' : 'var(--red)'}">${totalRet >= 0 ? '+' : ''}${totalRet.toFixed(0)}%</span></div>`;
+  $('d-decomp').innerHTML = dhtml;
+}
+
+// Event listeners
+['i-price', 'i-eps', 'i-growth', 'i-years'].forEach(id => {
+  $(id).addEventListener('input', () => {
+    if (exitPEOverride === null) update();
+    else update();
+  });
+});
+$('i-exitpe').addEventListener('input', function() {
+  exitPEOverride = parseFloat(this.value);
+  update();
+});
+window.addEventListener('resize', update);
+
+// Init
+update();
+</script>
+</body>
+</html>
